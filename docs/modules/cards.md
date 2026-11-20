@@ -73,6 +73,8 @@ the reason, rather than leaving every code block silently unstyled.
 - TUI modes only. Non-TUI modes are untouched.
 - Mouse reporting is a fullscreen feature, so regular mode never sends card clicks:
   the terminal's own selection (Shift-drag in most terminals) applies there.
+- To keep selection terminal-native instead of Pi-native, see
+  [../native-selection.md](../native-selection.md).
 - Two byte-identical code blocks in one message can be toggled as a pair. Pi's
   Markdown renderer memoizes blocks by raw source, so the second copy never reaches
   the patch and a click resolves to the wrong index. Two cases in

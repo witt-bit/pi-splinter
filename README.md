@@ -88,6 +88,12 @@ npm run typecheck   # tsc --noEmit
 npm test            # render tests (node test/render.test.mjs)
 ```
 
+## Notes
+
+- [docs/native-selection.md](./docs/native-selection.md) — why text selection either
+  belongs to Pi or to the terminal, which knobs exist (Ghostty `mouse-shift-capture`,
+  `toggle_mouse_reporting`, `tuiMode: regular`), and what cannot be built.
+
 ## Provenance
 
 The `cards` module started as [chengyayu/pi-code-render](https://github.com/chengyayu/pi-code-render)
