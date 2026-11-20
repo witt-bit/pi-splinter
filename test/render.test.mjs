@@ -47,10 +47,19 @@ const theme = {
 };
 
 // Install the real extension through its public entry point.
+// Pi runs every registered handler for an event; the harness has to do the same,
+// or a second module registering `session_start` would silently displace the
+// first one's.
 const handlers = {};
-extension({ registerShortcut() {}, on(name, fn) { handlers[name] = fn; } });
+extension({
+  registerShortcut() {},
+  on(name, fn) { (handlers[name] ??= []).push(fn); },
+});
+const emit = (name, ...args) => {
+  for (const fn of handlers[name] ?? []) fn(...args);
+};
 const tuiContext = { mode: "tui", ui: { theme, setStatus() {}, notify() {} } };
-handlers.session_start({}, tuiContext);
+emit("session_start", {}, tuiContext);
 
 const WIDTH = 80;
 // 渲染行里带不可见的零宽锚点（\u200b 按钮锚点、\u2060 raw 起点锚点）。用户看不到它们，
@@ -428,11 +437,11 @@ console.log("\n-- 6. 重新安装（/reload）--");
   const snapshot = () => plain(new Markdown(doc, 0, 0, theme).render(WIDTH));
   const baseline = snapshot();
 
-  handlers.session_shutdown();
-  handlers.session_start({}, tuiContext);
+  emit("session_shutdown");
+  emit("session_start", {}, tuiContext);
   const afterReload = snapshot();
 
-  handlers.session_start({}, tuiContext); // 不 shutdown 直接再装一次
+  emit("session_start", {}, tuiContext); // 不 shutdown 直接再装一次
   const afterRepeat = snapshot();
 
   check(
@@ -453,7 +462,7 @@ console.log("\n-- 7. 启动自检降级 --");
   const doc = ["前言", "", "```js", "const a = 1;", "```", "", "结语"].join("\n");
   const renderDoc = () => plain(new Markdown(doc, 0, 0, theme).render(WIDTH));
   // 上一节结束时 patch 还装着；先还原，拿到真正的原生基线。
-  handlers.session_shutdown();
+  emit("session_shutdown");
   const native = renderDoc().join("\n");
   const notifications = [];
   // buildCard 会调 theme.bg；让它抛错即可靠地模拟“渲染器形状变了”。
@@ -474,7 +483,7 @@ console.log("\n-- 7. 启动自检降级 --");
     },
   };
 
-  handlers.session_start({}, brokenContext);
+  emit("session_start", {}, brokenContext);
   const degraded = renderDoc().join("\n");
   check(
     "自检：theme 破损时 patch 被还原为原生渲染",
@@ -489,7 +498,7 @@ console.log("\n-- 7. 启动自检降级 --");
   );
 
   // 恢复正常 theme 后重新安装，卡片必须回来（真实场景：用户修好环境后重启会话）。
-  handlers.session_start({}, tuiContext);
+  emit("session_start", {}, tuiContext);
   const recovered = renderDoc().join("\n");
   check("自检：恢复正常 theme 后卡片回归", recovered !== native && has(recovered.split("\n"), "[COPY]"));
 }

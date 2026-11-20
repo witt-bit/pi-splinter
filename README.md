@@ -13,6 +13,7 @@ and its own wiring, so a patch can be added or dropped without touching the rest
 | Module | Fixes | Docs |
 | --- | --- | --- |
 | `cards` | Flush-edge code cards in the assistant transcript, with a `[COPY]` button, a click-to-toggle raw view, mouse text selection inside a card, and repaint on light/dark switch | [docs/modules/cards.md](./docs/modules/cards.md) |
+| `selection` | Releases the mouse selection once its copy lands, so a completed selection stops covering the transcript (and the caret) until the next click | [docs/modules/selection.md](./docs/modules/selection.md) |
 
 ## Install
 
@@ -85,7 +86,7 @@ Rules that keep the package maintainable:
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm test            # render tests (node test/render.test.mjs)
+npm test            # render + selection tests (test/*.test.mjs)
 ```
 
 ## Notes

@@ -1,7 +1,7 @@
 {
   "name": "pi-splinter",
   "version": "0.1.0",
-  "description": "A grab bag of quality-of-life patches for the Pi TUI. Starts with flush-edge code cards: copy button, raw-text toggle, mouse text selection, and theme repaint.",
+  "description": "A grab bag of quality-of-life patches for the Pi TUI. Starts with flush-edge code cards (copy button, raw-text toggle, mouse text selection, theme repaint) and selection release after copy.",
   "license": "MIT",
   "author": "witt <coder.witt@gmail.com>",
   "contributors": [
@@ -30,7 +30,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node test/render.test.mjs"
+    "test": "node test/run.mjs"
   },
   "files": [
     "extensions",

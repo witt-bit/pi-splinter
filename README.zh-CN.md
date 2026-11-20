@@ -14,6 +14,7 @@
 | 模块 | 修什么 | 文档 |
 | --- | --- | --- |
 | `cards` | assistant 消息里的代码块渲染成整宽卡片：`[COPY]` 按钮、点击切原文、卡片内可拖动选中、明暗切换重绘 | [docs/modules/cards.md](./docs/modules/cards.md) |
+| `selection` | 复制成功后释放鼠标选区：选中区域不再一直高亮到下次点击，也不会盖住输入光标 | [docs/modules/selection.md](./docs/modules/selection.md) |
 
 ## 安装
 
