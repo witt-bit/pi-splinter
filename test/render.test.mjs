@@ -1,23 +1,33 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { transform } from "esbuild";
+import { build } from "esbuild";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = process.argv[2];
 const extensionPath = arg
   ? resolve(process.cwd(), arg)
-  : resolve(here, "../extensions/pi-code-render.ts");
+  : resolve(here, "../extensions/pi-splinter.ts");
 
-// Node 22 (CI) cannot import TypeScript directly, so the extension is
-// transpiled to a temp file inside the repo first: the harness and the extension
-// must share one `@earendil-works/pi-tui` instance, since the patch replaces
-// methods on that module's `Markdown.prototype`.
-const source = await readFile(extensionPath, "utf8");
-const { code } = await transform(source, { loader: "ts", format: "esm", target: "node22" });
+// Node 22 (CI) cannot import TypeScript directly, so the extension is bundled to
+// a temp file inside the repo first: the harness and the extension must share one
+// `@earendil-works/pi-tui` instance, since the patch replaces methods on that
+// module's `Markdown.prototype`. Pi stays external for that reason, and because
+// the modules are imported across directories the output has to be bundled rather
+// than transpiled file by file.
+const { outputFiles } = await build({
+  entryPoints: [extensionPath],
+  bundle: true,
+  format: "esm",
+  platform: "node",
+  target: "node22",
+  external: ["@earendil-works/*"],
+  write: false,
+  logLevel: "warning",
+});
 const staging = await mkdtemp(resolve(here, ".staged-"));
-const stagedFile = resolve(staging, "pi-code-render.mjs");
-await writeFile(stagedFile, code, "utf8");
+const stagedFile = resolve(staging, "pi-splinter.mjs");
+await writeFile(stagedFile, outputFiles[0].text, "utf8");
 const { default: extension } = await import(pathToFileURL(stagedFile).href);
 await rm(staging, { recursive: true, force: true });
 
@@ -428,7 +438,7 @@ console.log("\n-- 7. 启动自检降级 --");
     "自检：降级时发出 warning 且说明原因",
     notifications.length === 1 &&
       notifications[0].level === "warning" &&
-      notifications[0].message.includes("pi-code-render disabled"),
+      notifications[0].message.includes("pi-splinter cards disabled"),
     notifications[0]?.message ?? "无通知",
   );
 

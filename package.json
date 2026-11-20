@@ -1,8 +1,15 @@
 {
-  "name": "pi-code-render",
-  "version": "0.1.10",
-  "description": "Render fenced code blocks in Pi's transcript as styled, flush-edge cards with one-click copy and a raw-text toggle.",
+  "name": "pi-splinter",
+  "version": "0.1.0",
+  "description": "A grab bag of quality-of-life patches for the Pi TUI. Starts with flush-edge code cards: copy button, raw-text toggle, mouse text selection, and theme repaint.",
   "license": "MIT",
+  "author": "witt <coder.witt@gmail.com>",
+  "contributors": [
+    {
+      "name": "pi-code-render contributors",
+      "url": "https://github.com/chengyayu/pi-code-render"
+    }
+  ],
   "keywords": [
     "pi-package",
     "pi",
@@ -11,12 +18,14 @@
     "coding-agent",
     "terminal-ui",
     "tui",
+    "quality-of-life",
     "code-blocks",
-    "code-rendering"
+    "code-rendering",
+    "mouse-selection"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chengyayu/pi-code-render.git"
+    "url": "git+https://github.com/witt-bit/pi-splinter.git"
   },
   "type": "module",
   "scripts": {
@@ -25,13 +34,15 @@
   },
   "files": [
     "extensions",
+    "src",
+    "docs/modules",
     "README.md",
     "README.zh-CN.md",
     "LICENSE"
   ],
   "pi": {
     "extensions": [
-      "./extensions/pi-code-render.ts"
+      "./extensions/pi-splinter.ts"
     ]
   },
   "peerDependencies": {

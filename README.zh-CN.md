@@ -1,45 +1,33 @@
-# pi-code-render
+# pi-splinter
 
-> 把 Pi 终端里的代码块渲染成带一键复制按钮的卡片。
+> Pi 终端里那些提了上游却没人管的小别扭，收进一个插件一次修掉。
 
 [English](./README.md) | 中文
 
-`pi-code-render` 是 [Pi coding agent](https://pi.dev/) 的扩展。它把 assistant 消息中的
-围栏代码块渲染成主题配色的整宽卡片，右上角带一个 `[COPY]` 按钮，点击卡片任意位置
-即可切回原始 markdown 文本。
+`pi-splinter` 是 [Pi coding agent](https://pi.dev/) 的扩展包。一个模块负责一类别扭，
+每个模块独占一个目录、一篇文档，各自安装与卸载，互不依赖。
 
-![pi-code-render 卡片效果](https://raw.githubusercontent.com/chengyayu/pi-code-render/main/docs/card.png)
+![代码卡片效果](https://raw.githubusercontent.com/witt-bit/pi-splinter/main/docs/card.png)
 
-## 效果对比
+## 模块
 
-| Pi 原生渲染 | 使用 pi-code-render |
-| --- | --- |
-| ![原生围栏代码块](https://raw.githubusercontent.com/chengyayu/pi-code-render/main/docs/before.png) | ![卡片效果](https://raw.githubusercontent.com/chengyayu/pi-code-render/main/docs/card.png) |
-
-## 功能
-
-- **代码卡片** — assistant 消息中的代码块渲染成主题配色的整宽面板，风格与 Pi 原生的
-  codemode 面板一致。`[COPY]` 按钮位于代码首行行尾，因此代码上方没有多余的语言标签行，
-  代码紧接着卡片顶部开始。
-- **一键复制** — 右上角 `[COPY]` 按钮把该代码块源码（已去掉围栏）复制到剪贴板。
-  `Ctrl+Alt+C` 可在任意位置复制最近渲染的代码块。
-- **原文切换** — 点击卡片任意位置可在卡片与原始围栏文本之间切换，再次点击即恢复。
-- **智能高亮** — 形如 ` ```js workflow ` 的 info string 会按 JavaScript 高亮；
-  未知语言保留纯文本渲染。
-- **剪贴板优先用原生实现** — 优先使用 Pi 的原生剪贴板助手，失败时回退到
-  `pbcopy` / `wl-copy` / `xclip` / `clip`。
-- **临时提示** — 复制成功后在页脚显示状态，2 秒后自动清除，不会留在对话记录里。
-- **不动你的消息** — 你自己发的消息和 thinking 块中的代码块保持 Pi 原生渲染。
+| 模块 | 修什么 | 文档 |
+| --- | --- | --- |
+| `cards` | assistant 消息里的代码块渲染成整宽卡片：`[COPY]` 按钮、点击切原文、卡片内可拖动选中、明暗切换重绘 | [docs/modules/cards.md](./docs/modules/cards.md) |
 
 ## 安装
 
 ```bash
-pi install npm:pi-code-render
+pi install npm:pi-splinter
 ```
 
-安装后重启 Pi，或执行 `/reload`。
+安装后重启 Pi，或执行 `/reload`。只想试一次、不动配置：
 
-## 使用
+```bash
+pi -e npm:pi-splinter
+```
+
+## 使用：cards
 
 | 操作 | 结果 |
 | --- | --- |
@@ -47,33 +35,45 @@ pi install npm:pi-code-render
 | 在卡片上拖动 | 按普通文本选中（Pi 的选中即复制会一并复制） |
 | 点击卡片其他位置 | 在卡片与原始围栏文本之间切换 |
 | 点击原始文本里的代码 | 折回卡片 |
-| 在原始文本的代码上拖动 | 按普通文本选中（Pi 的选中即复制会一并复制） |
+| 在原始文本的代码上拖动 | 按普通文本选中 |
 | `Ctrl+Alt+C` | 复制最近渲染的代码块 |
 
 press 交给 Pi，所以拖动可以起选区；只有 `[COPY]` 按钮会接住 press。折叠因此挂在
-Pi 回派的 click 上——按下与松开落在同一格时才会派发：原地单击折叠卡片，拖动则是
-选中文本，双击仍然选词。
+Pi 回派的 click 上——按下与松开落在同一格时才派发：原地单击折叠卡片，拖动则是选中
+文本，双击仍然选词。
 
 ## 兼容性
 
-- 需要 Pi 0.99.0 或更高版本。
-- 在 regular 和 fullscreen TUI 模式下均可工作；非 TUI 模式不受影响。
-- 卡片效果通过 patch Pi 内部的 Markdown 渲染器实现，该渲染器目前没有公开的
-  transcript 样式钩子。未来 Pi 版本可能需要本包跟进更新。
-- **启动自检**：每次 session start 时，扩展会用固定样例渲染一遍并校验卡片形状。
-  如果 Pi 内部结构变化导致 patch 不再成立，扩展会还原为原生渲染并发出一条
-  warning 说明原因，而不是静默失效。CI 会对最新版和上一 minor 的 Pi 各跑一遍
-  测试，尽量在发版前发现这类变化。
+- 需要 Pi 0.99.0 或更高版本；当前按 Pi 1.5.2 验证。
+- regular 与 fullscreen TUI 均可工作；非 TUI 模式不受影响。
+- 模块通过 patch Pi 内部渲染器实现，Pi 目前没有公开的 transcript 样式钩子，未来
+  版本可能需要本包跟进。
+- **启动自检**：每次 session start，`cards` 会用固定样例走一遍 patch 并校验卡片形状。
+  形状不符时还原原生渲染并发 warning 说明原因，而不是静默失效。CI 对最新版与上一
+  minor 的 Pi 各跑一遍测试。
 
-## 卸载
+## 已知问题
 
-```bash
-pi remove npm:pi-code-render
+- 同一条消息里两个逐字节相同的代码块会被一起切换：Pi 的 Markdown 渲染器按代码块源码
+  做块级复用，第二份不会走到 patch，点击会落到错误的块上。对应
+  `test/render.test.mjs` 中两条失败用例（「相同源码：raw 块落在两张卡片之间」、
+  「相同源码：raw 位移后仍能切换第三张」），上游同样失败。
+
+## 新增模块
+
+```text
+src/modules/<id>/index.ts    接线：监听、快捷键、卸载；导出一个 SplinterModule
+src/modules/<id>/*.ts        patch 本体，可用任何 Pi 暴露的缝隙
+src/modules/index.ts         一行：把模块加进列表
+docs/modules/<id>.md         改了什么、怎么交互、边界在哪
 ```
 
-## License
+约定：
 
-MIT
+- 模块之间不互相 import，共用工具放 `src/shared/`。
+- 每个模块在 `session_start` 装配、`session_shutdown` 完整还原，`/reload` 不能叠加第二份。
+- 任何 patch Pi 内部的模块都要带启动自检，形状不符时退回原生渲染。
+- 不想要的模块 = 删掉 `src/modules/index.ts` 里那一行、目录和文档页。
 
 ## 开发
 
@@ -81,3 +81,14 @@ MIT
 npm run typecheck   # tsc --noEmit
 npm test            # 渲染测试（node test/render.test.mjs）
 ```
+
+## 来历
+
+`cards` 模块来自 [chengyayu/pi-code-render](https://github.com/chengyayu/pi-code-render)
+0.1.10，并合入两个上游提交了但一直没人评审的修复（chengyayu/pi-code-render#3 及 #4、
+#5 及 #6）。上游的 commit 历史完整保留，`f373aad` 之后才是本包自己的改动。
+详见 [docs/provenance.md](./docs/provenance.md)。
+
+## License
+
+MIT。来自上游的部分版权归 pi-code-render contributors（2026），见 [LICENSE](./LICENSE)。

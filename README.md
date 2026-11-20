@@ -1,48 +1,32 @@
-# pi-code-render
+# pi-splinter
 
-English | [中文](./README.zh-CN.md)
+Small quality-of-life patches for the [Pi coding agent](https://pi.dev/) TUI — the
+ones that were reported upstream and never got to.
 
-`pi-code-render` renders fenced code blocks in assistant messages as styled,
-flush-edge cards with a one-click `[COPY]` button and a click-to-toggle
-raw-text view for the [Pi coding agent](https://pi.dev/).
+One package, one module per annoyance. Each module owns a directory, a docs page,
+and its own wiring, so a patch can be added or dropped without touching the rest.
 
-![pi-code-render cards](https://raw.githubusercontent.com/chengyayu/pi-code-render/main/docs/card.png)
+![code cards](https://raw.githubusercontent.com/witt-bit/pi-splinter/main/docs/card.png)
 
-## Before / After
+## Modules
 
-| Native rendering | With pi-code-render |
-| --- | --- |
-| ![Before: native fenced blocks](https://raw.githubusercontent.com/chengyayu/pi-code-render/main/docs/before.png) | ![After: code cards](https://raw.githubusercontent.com/chengyayu/pi-code-render/main/docs/card.png) |
-
-## Features
-
-- **Code cards** — fenced code blocks in assistant messages render as
-  theme-colored, full-width panels, matching Pi's native codemode panel look.
-  The `[COPY]` button sits at the end of the block's first line, so the code
-  starts immediately with no language-label header above it.
-- **One-click copy** — a `[COPY]` button in the top-right copies the block's
-  source (fences stripped) to the clipboard. `Ctrl+Alt+C` copies the most
-  recently rendered block from anywhere.
-- **Raw-text toggle** — click anywhere on a card to switch that block back to
-  the original fenced markdown; click again to restore the card.
-- **Smart highlighting** — info strings like ```` ```js workflow ```` highlight
-  as JavaScript. Plain-text rendering is preserved for unknown languages.
-- **Native-first clipboard** — uses Pi's native clipboard helper with
-  `pbcopy` / `wl-copy` / `xclip` / `clip` fallbacks.
-- **Transient feedback** — successful copies show a footer status that clears
-  itself after 2 seconds instead of persisting in the transcript.
-- **User messages untouched** — code blocks in your own messages and thinking
-  blocks keep Pi's native rendering.
+| Module | Fixes | Docs |
+| --- | --- | --- |
+| `cards` | Flush-edge code cards in the assistant transcript, with a `[COPY]` button, a click-to-toggle raw view, mouse text selection inside a card, and repaint on light/dark switch | [docs/modules/cards.md](./docs/modules/cards.md) |
 
 ## Install
 
 ```bash
-pi install npm:pi-code-render
+pi install npm:pi-splinter
 ```
 
-Then restart Pi or run `/reload`.
+Then restart Pi or run `/reload`. To try it without touching your settings:
 
-## Usage
+```bash
+pi -e npm:pi-splinter
+```
+
+## Usage: cards
 
 | Action | Result |
 | --- | --- |
@@ -50,7 +34,7 @@ Then restart Pi or run `/reload`.
 | Drag inside a card | Select its text as normal text (Pi's copy-on-select copies it) |
 | Click anywhere else on a card | Toggle between card and raw fenced text |
 | Click a raw block's code | Toggle it back to a card |
-| Drag over a raw block's code | Select it as normal text (Pi's copy-on-select copies it) |
+| Drag over a raw block's code | Select it as normal text |
 | `Ctrl+Alt+C` | Copy the most recently rendered code block |
 
 The press is left to Pi so a drag selects text; only the `[COPY]` button keeps it.
@@ -60,27 +44,42 @@ double-click still selects a word.
 
 ## Compatibility
 
-- Requires Pi 0.99.0 or later.
+- Requires Pi 0.99.0 or later; verified against Pi 1.5.2.
 - Works in regular and fullscreen TUI modes; non-TUI modes are unaffected.
-- The card presentation patches Pi's internal Markdown renderer, which does
-  not currently expose public hooks for transcript styling. A future Pi
-  release may require an update to this package.
-- **Startup self-check.** On every session start the extension renders a fixed
-  sample through the patched renderer and verifies the card shape. If Pi's
-  internals no longer match what the patch assumes, it restores native
-  rendering and posts a warning explaining why, instead of failing silently.
-  CI additionally runs the test suite against the latest and previous-minor Pi
-  releases to catch such changes before they ship.
+- Modules patch Pi's internal renderer, which exposes no public hook for
+  transcript styling. A future Pi release may require an update here.
+- **Startup self-check.** On every session start the `cards` module renders a fixed
+  sample through its patch and verifies the card shape. If Pi's internals no longer
+  match what the patch assumes, it restores native rendering and posts a warning
+  explaining why, instead of failing silently. CI runs the test suite against the
+  latest and previous-minor Pi releases.
 
-## Uninstall
+## Known issues
 
-```bash
-pi remove npm:pi-code-render
+- Two byte-identical code blocks in one message can be toggled as a pair: Pi's
+  Markdown renderer memoizes blocks by their raw source, so the second copy never
+  reaches the patch and the click resolves to the wrong block. Tracked by the two
+  failing cases in `test/render.test.mjs` ("相同源码：raw 块落在两张卡片之间",
+  "相同源码：raw 位移后仍能切换第三张"); they fail upstream as well.
+
+## Adding a module
+
+```text
+src/modules/<id>/index.ts    wiring: listeners, shortcuts, teardown; exports a SplinterModule
+src/modules/<id>/*.ts        the patch itself, free to use whatever seam Pi exposes
+src/modules/index.ts         one line: add the module to the list
+docs/modules/<id>.md         what it changes, its interaction, its limits
 ```
 
-## License
+Rules that keep the package maintainable:
 
-MIT
+- One module never imports another. Shared helpers go in `src/shared/`.
+- Each module installs in `session_start` and fully reverts in `session_shutdown`;
+  a `/reload` must not stack a second copy of a patch.
+- Anything that patches Pi internals ships a startup self-check that degrades to
+  native behaviour instead of breaking the transcript.
+- A module that turns out to be unwanted is deleted by removing its line in
+  `src/modules/index.ts`, its directory, and its docs page.
 
 ## Development
 
@@ -88,3 +87,16 @@ MIT
 npm run typecheck   # tsc --noEmit
 npm test            # render tests (node test/render.test.mjs)
 ```
+
+## Provenance
+
+The `cards` module started as [chengyayu/pi-code-render](https://github.com/chengyayu/pi-code-render)
+0.1.10, plus the two fixes that were opened upstream and never reviewed
+(chengyayu/pi-code-render#3 with #4, and #5 with #6). Upstream's commit history is
+kept intact: everything after `f373aad` is this package's own work. See
+[docs/provenance.md](./docs/provenance.md).
+
+## License
+
+MIT. Upstream portions copyright (c) 2026 pi-code-render contributors; see
+[LICENSE](./LICENSE).
