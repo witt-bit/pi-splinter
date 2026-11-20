@@ -22,9 +22,12 @@ Details that were deliberate:
 
 - The `[COPY]` button sits at the end of the block's first line, so the code starts
   immediately, with no language-label header above it.
-- The press is left to Pi except on the button. Dragging therefore selects text;
-  folding hangs off Pi's click, which is dispatched only when press and release
-  land on the same cell. Double-click selects a word and never folds.
+- The press is left to Pi except on the button, and the event bubbles up through
+  the transcript containers as unhandled. That is what lets Pi start a text
+  selection: dragging inside a card selects text (and copies it in fullscreen mode,
+  where copy-on-select is on) instead of folding the block. Folding hangs off Pi's
+  click, which is dispatched only when press and release land on the same cell.
+  Double-click selects a word and never folds.
 - A press records the block it landed on. If streaming renumbers blocks before the
   click arrives, the click refuses to act rather than folding its neighbour.
 - Info strings like ` ```js workflow ` highlight as JavaScript; unknown languages
@@ -68,6 +71,8 @@ the reason, rather than leaving every code block silently unstyled.
 
 - Requires Pi 0.99.0 or later; verified against Pi 1.5.2.
 - TUI modes only. Non-TUI modes are untouched.
+- Mouse reporting is a fullscreen feature, so regular mode never sends card clicks:
+  the terminal's own selection (Shift-drag in most terminals) applies there.
 - Two byte-identical code blocks in one message can be toggled as a pair. Pi's
   Markdown renderer memoizes blocks by raw source, so the second copy never reaches
   the patch and a click resolves to the wrong index. Two cases in

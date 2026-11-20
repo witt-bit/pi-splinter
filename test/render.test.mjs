@@ -31,7 +31,7 @@ await writeFile(stagedFile, outputFiles[0].text, "utf8");
 const { default: extension } = await import(pathToFileURL(stagedFile).href);
 await rm(staging, { recursive: true, force: true });
 
-const { Markdown, stripTerminalSequences } = await import("@earendil-works/pi-tui");
+const { Box, Markdown, stripTerminalSequences } = await import("@earendil-works/pi-tui");
 
 const id = (value) => value;
 // Real themes emit ANSI for emphasis, and the extension searches stripped rows.
@@ -284,6 +284,37 @@ console.log("\n-- 4. 鼠标手势 --");
     md.handleMouse(mouseAt(1, y, "release"));
     pressRelease(md, y);
     check("移动：hover 不取消折叠", !card(md));
+  }
+}
+
+// ===========================================================================
+// 4.5 真实分发：press 经容器冒泡后仍是「未处理」
+//     前几节直接调 Markdown.handleMouse；这里让它走真实的 Box 分发路径，因为 Pi
+//     能否起选区取决于容器把它当成未处理事件（dispatchMouseEvent 返回 undefined）。
+// ===========================================================================
+console.log("\n-- 4.5 真实分发：拖选而非折叠 --");
+{
+  const doc = ["前言", "", "```js", "const a = 1;", "```", "", "结语"].join("\n");
+  const fresh = () => {
+    const md = new Markdown(doc, 0, 0, theme);
+    const box = new Box(0, 0);
+    box.addChild(md);
+    const rows = plain(box.render(WIDTH));
+    return { md, box, y: rows.findIndex((line) => line.includes("const a = 1;")) };
+  };
+
+  {
+    const { md, box, y } = fresh();
+    check("真实分发：卡片正文的 press 冒泡后仍未处理", box.handleMouse(mouseAt(1, y, "press")) === undefined, "被当成已处理，Pi 就起不了选区");
+    check("真实分发：拖动冒泡后仍未处理", box.handleMouse(mouseAt(14, y, "drag")) === undefined);
+    check("真实分发：拖到别处松开不折叠", rowIsCard(md, "const a = 1;"));
+  }
+  {
+    const { md, box, y } = fresh();
+    box.handleMouse(mouseAt(1, y, "press"));
+    box.handleMouse(mouseAt(1, y, "release"));
+    box.handleMouse({ ...mouseAt(1, y, "click"), clickCount: 1 });
+    check("真实分发：原地单击仍折叠（拖选不能牺牲折叠）", !rowIsCard(md, "const a = 1;"));
   }
 }
 
