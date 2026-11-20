@@ -44,6 +44,30 @@ The startup self-check confirms the three methods still exist and that the patch
 is the installed one. If a Pi upgrade renames or drops them, the module restores
 the originals and warns once, instead of silently doing nothing.
 
+## Why this is not a copy-latency fix
+
+The reported symptom was "the copy is slow: `Copied!` shows up late, and the
+clipboard only has the text after that". Measurement says the copy path is not the
+bottleneck, and the lingering highlight was what made it look like one: with no
+visible end to the gesture, the next click becomes the moment the action feels
+finished.
+
+Numbers from a real `TuiAltScreen` driven with SGR mouse sequences on macOS:
+
+| Step | Measured |
+| --- | --- |
+| release event to `copySelectionToClipboard` | 0.19 - 0.34 ms |
+| release to clipboard write finished | 0.38 ms |
+| release to the first painted frame (incl. `Copied!`) | 2.1 ms |
+| native clipboard write (darwin prebuilt) | 0.3 ms steady, 6.1 ms first call |
+| `pbcopy` fallback spawn | 10 - 15 ms |
+| selection text extraction | 12 ms per 1000 rows |
+
+So the fix that helped was releasing the selection, not speeding up the copy. If a
+delay ever shows up for real, measure it rather than guessing: the render floor is
+`MIN_RENDER_INTERVAL_MS = 16` per frame, and text extraction is the only part that
+grows with the size of the selection.
+
 ## Limits
 
 - Fullscreen TUI only. The regular renderer has no mouse code and no selection, so
