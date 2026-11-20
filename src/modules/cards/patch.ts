@@ -34,6 +34,26 @@ const RAW_ANCHOR = "\u2060";
 const SELF_CHECK_SAMPLE = "```ts\nconst alpha = 1;\nconst beta = alpha + 2;\n```";
 /** Terminal width used by the self-check; wide enough to avoid wrapping. */
 const SELF_CHECK_WIDTH = 60;
+/**
+ * A link definition Pi never renders, appended for the duration of one render.
+ *
+ * Pi 1.5.x renders a document in a single pass and memoises blocks by
+ * `token.raw`, so a byte-identical second block reuses the first one's lines and
+ * never reaches `renderToken`. The capture then holds fewer blocks than the
+ * transcript shows cards for, and every card after the duplicate maps to the
+ * wrong block: clicking the card that displays block N copies block N+1's source
+ * (the last card copies nothing).
+ *
+ * Pi's own escape hatch sits two lines above that memo:
+ * `reuseBlocks = Object.keys(tokens.links).length === 0`. One link definition
+ * disables reuse for the whole document, and definitions render nothing, so the
+ * transcript is unchanged. `[COPY]` labels and the copied source stay untouched
+ * because the sentinel only exists while the render call runs.
+ */
+const REUSE_BREAKER = "[pi-splinter-no-block-reuse]: #\n\n";
+
+/** Text field and setter Pi's Markdown exposes; read through one narrow view. */
+type MarkdownText = { text?: string; setText?: (text: string) => void };
 
 /** Left/right padding inside a code card, in terminal columns. */
 const CARD_PAD = "  ";
@@ -258,6 +278,13 @@ export function installPatch(
   const getText = (instance: Markdown): string =>
     (instance as unknown as { text?: string }).text ?? "";
 
+  /** Restore the exact text after the reuse breaker has done its job. */
+  const setText = (instance: Markdown, text: string): void => {
+    const target = instance as unknown as MarkdownText;
+    if (typeof target.setText === "function") target.setText(text);
+    else target.text = text;
+  };
+
   /**
    * User messages and thinking blocks pass a defaultTextStyle to Markdown;
    * assistant transcript text does not. Keep Pi's native rendering there.
@@ -400,9 +427,16 @@ export function installPatch(
     const currentBlocks: CodeBlock[] = [];
     captureBlocks.set(this, currentBlocks);
     let lines: string[];
+    // Break block reuse so every code token - duplicates included - reaches
+    // renderToken. See REUSE_BREAKER: without this, a repeated block shifts every
+    // later card onto its neighbour's source.
+    // Prepended, not appended: an unterminated fence at the end of the message
+    // would swallow an appended definition into its code token.
+    setText(this, `${REUSE_BREAKER}${text}`);
     try {
       lines = originalRender.call(this, width);
     } finally {
+      setText(this, text);
       captureBlocks.delete(this);
     }
 

@@ -15,6 +15,18 @@ const extensionPath = arg
 // module's `Markdown.prototype`. Pi stays external for that reason, and because
 // the modules are imported across directories the output has to be bundled rather
 // than transpiled file by file.
+// Clipboard is stubbed to a recorder so the tests can assert *which* block a
+// click copies without touching the machine clipboard.
+const clipboardStub = {
+  name: "clipboard-stub",
+  setup(builder) {
+    builder.onResolve({ filter: /shared\/clipboard/ }, () => ({ path: "clipboard", namespace: "splinter-stub" }));
+    builder.onLoad({ filter: /.*/, namespace: "splinter-stub" }, () => ({
+      contents: 'export async function writeClipboard(text) { (globalThis.__splinterCopied ??= []).push(text); }',
+      loader: "js",
+    }));
+  },
+};
 const { outputFiles } = await build({
   entryPoints: [extensionPath],
   bundle: true,
@@ -24,6 +36,7 @@ const { outputFiles } = await build({
   external: ["@earendil-works/*"],
   write: false,
   logLevel: "warning",
+  plugins: [clipboardStub],
 });
 const staging = await mkdtemp(resolve(here, ".staged-"));
 const stagedFile = resolve(staging, "pi-splinter.mjs");
@@ -501,6 +514,50 @@ console.log("\n-- 7. 启动自检降级 --");
   emit("session_start", {}, tuiContext);
   const recovered = renderDoc().join("\n");
   check("自检：恢复正常 theme 后卡片回归", recovered !== native && has(recovered.split("\n"), "[COPY]"));
+}
+
+// ===========================================================================
+// 8. 内容重复的代码块
+//    Pi 1.5.x 按 token.raw 复用渲染块，字节相同的第二个块不会进 renderToken，
+//    于是块索引比卡片少，后面每张卡片都错位：点显示 AAA 的卡片复制到 CCC。
+//    现在靠注入一条不可见的 link definition 关掉复用（见 patch.ts REUSE_BREAKER）。
+// ===========================================================================
+console.log("\n-- 8. 内容重复的代码块：复制的是自己 --");
+{
+  const block = (name) => ["```js", `const ${name} = 1;`, "```"];
+
+  /** 点第 index 张卡片的 [COPY]，返回实际写进剪贴板的源码。 */
+  const copyFromCard = async (md, index) => {
+    globalThis.__splinterCopied = [];
+    const rows = plain(md.render(WIDTH));
+    const buttons = rows.map((line, y) => (line.includes("[COPY]") ? y : -1)).filter((y) => y >= 0);
+    const y = buttons[index];
+    const x = rows[y].lastIndexOf("[COPY]") + 3;
+    md.handleMouse(mouseAt(x, y, "press"));
+    md.handleMouse(mouseAt(x, y, "release"));
+    md.handleMouse(mouseAt(x, y, "click"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return globalThis.__splinterCopied.at(-1);
+  };
+
+  {
+    const md = new Markdown([...block("AAA"), "", "文字一", "", ...block("AAA"), "", "文字二", "", ...block("CCC")].join("\n"), 0, 0, theme);
+    const buttons = plain(md.render(WIDTH)).filter((line) => line.includes("[COPY]")).length;
+    check("重复块：三块全部渲染成卡片", buttons === 3, `卡片数 = ${buttons}`);
+    check("重复块：点第 2 张复制它自己的源码", (await copyFromCard(md, 1)) === "const AAA = 1;");
+    check("重复块：点第 3 张复制它自己的源码", (await copyFromCard(md, 2)) === "const CCC = 1;");
+  }
+  {
+    // 中间那块切成 raw 之后，索引不能跟着错位
+    const md = new Markdown([...block("AAA"), "", "文字一", "", ...block("AAA"), "", "文字二", "", ...block("CCC")].join("\n"), 0, 0, theme);
+    pressRelease(md, rowOf(md, "const AAA = 1;") + 0);
+    const lastCard = plain(md.render(WIDTH)).map((line, y) => (line.includes("[COPY]") ? y : -1)).filter((y) => y >= 0).at(-1);
+    check("重复块：切走一张后仍能点到最后一张", typeof lastCard === "number" && (await copyFromCard(md, 1)) === "const CCC = 1;");
+  }
+  {
+    const md = new Markdown([...block("AAA"), "", "文字一", "", ...block("BBB"), "", "文字二", "", ...block("AAA")].join("\n"), 0, 0, theme);
+    check("重复块：首尾相同、中间不同，点第 3 张仍复制 AAA", (await copyFromCard(md, 2)) === "const AAA = 1;");
+  }
 }
 
 console.log(failures === 0 ? "\n全部通过 ✅" : `\n${failures} 项失败 ❌`);

@@ -51,6 +51,22 @@ the palette changes. Two locks, because Pi offers two ways to replace a theme:
 Both are asserted in the render tests: one case invalidates between renders, one
 case deliberately does not.
 
+## Duplicate blocks
+
+Pi 1.5.x renders a document in one pass and memoises each block by `token.raw`:
+a byte-identical second code block reuses the first one's lines and never reaches
+`renderToken`. The block capture then holds fewer entries than the transcript has
+cards, and every card after the duplicate is mapped to its neighbour — clicking the
+card that displays block N copies block N+1's source, and the last card does
+nothing.
+
+The fix uses Pi's own escape hatch, two lines above that memo:
+`reuseBlocks = Object.keys(tokens.links).length === 0`. For the duration of one
+render the text is prefixed with a link definition Pi never renders, which turns
+reuse off for the document; the original text is restored in a `finally`. It is
+prepended rather than appended because an unterminated fence at the end of a
+message would swallow an appended definition into its code token.
+
 ## Why it is a patch and not a hook
 
 Pi's extension API can add commands, shortcuts, and overlays, but there is no
