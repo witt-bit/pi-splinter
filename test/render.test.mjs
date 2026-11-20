@@ -341,11 +341,11 @@ console.log("\n-- 5. raw 视图：可选中 + 单击折叠 --");
 }
 
 // ===========================================================================
-console.log("\n-- 5.5 主题切换：invalidate 后按新主题重绘 --");
+console.log("\n-- 5.5 主题切换：按新主题重绘 --");
 {
-  // 卡片行在渲染时就被上色并存进 layoutCache，缓存键只有宽度和文本。Pi 在主题
-  // 切换或预览时会 invalidate 组件树（pi-tui 的 Markdown.invalidate 注释写明了
-  // “主题可能变了”），插件必须在 invalidate 时丢掉缓存，否则旧配色会留在屏幕上。
+  // 卡片行在渲染时就被上色并存进 layoutCache。Pi 在主题切换或预览时会 invalidate
+  // 组件树（pi-tui 的 Markdown.invalidate 注释写明了“主题可能变了”），插件必须在
+  // invalidate 时丢掉缓存，否则旧配色会留在屏幕上。
   const cardBg = (code) => `\x1b[48;5;${code}m`;
   const themeWith = (code) => ({
     ...theme,
@@ -366,6 +366,21 @@ console.log("\n-- 5.5 主题切换：invalidate 后按新主题重绘 --");
     "主题切换：invalidate 后重绘使用新主题底色",
     second.includes(cardBg(22)) && !second.includes(cardBg(17)),
     second.includes(cardBg(17)) ? "仍是旧主题" : "",
+  );
+
+  // 第二道锁：缓存键里带调色板指纹，所以即使没人 invalidate（同文本 setText、
+  // 预览直接换主题对象、将来 Pi 不再调 invalidate），重绘也不会返回旧配色的行。
+  tuiContext.ui.theme = themeWith(17);
+  const mdNoInvalidate = new Markdown(doc, 0, 0, theme);
+  const beforeSwitch = mdNoInvalidate.render(WIDTH).join("\n");
+  check("主题切换：无 invalidate 场景的初始渲染", beforeSwitch.includes(cardBg(17)));
+
+  tuiContext.ui.theme = themeWith(22);
+  const noInvalidate = mdNoInvalidate.render(WIDTH).join("\n");
+  check(
+    "主题切换：未 invalidate 也按新主题重绘",
+    noInvalidate.includes(cardBg(22)) && !noInvalidate.includes(cardBg(17)),
+    noInvalidate.includes(cardBg(17)) ? "仍是旧主题" : "",
   );
 
   tuiContext.ui.theme = previousTheme;

@@ -30,9 +30,23 @@ Details that were deliberate:
 - Info strings like ` ```js workflow ` highlight as JavaScript; unknown languages
   keep plain-text rendering.
 - Code blocks in user messages and in thinking blocks keep native rendering.
-- Rendered rows are cached per instance. `Markdown.invalidate()` is patched to drop
-  that cache, which is what makes a light/dark switch repaint the cards instead of
-  reusing the old background.
+
+## Theme switching
+
+Card rows are painted when they are rendered, so a repaint has to be forced when
+the palette changes. Two locks, because Pi offers two ways to replace a theme:
+
+1. `Markdown.invalidate()` is patched to drop this module's row cache, so the
+   path Pi already uses — `ui.invalidate()` on a theme change or a theme preview —
+   repaints the cards with the new palette.
+2. The cache key carries a palette fingerprint (the card background plus the
+   accent colour) and Pi's own cache is dropped when that fingerprint moves, so a
+   paint that arrives without an invalidate still recolours: same-text `setText`,
+   a preview that swaps the theme object underneath, or a future Pi release that
+   stops invalidating on a theme change.
+
+Both are asserted in the render tests: one case invalidates between renders, one
+case deliberately does not.
 
 ## Why it is a patch and not a hook
 

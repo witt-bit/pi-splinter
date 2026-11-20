@@ -252,6 +252,8 @@ export function installPatch(
   const capturedEcho = new WeakSet<Markdown>();
   const pressedBlocks = new WeakMap<Markdown, PressedBlock>();
   const layoutCache = new WeakMap<Markdown, LayoutCache>();
+  /** Palette each instance was last rendered with, to notice a switch nobody invalidated. */
+  const paletteSeen = new WeakMap<Markdown, string>();
 
   const getText = (instance: Markdown): string =>
     (instance as unknown as { text?: string }).text ?? "";
@@ -262,6 +264,22 @@ export function installPatch(
    */
   const isPlainTextContext = (instance: Markdown): boolean =>
     !!(instance as unknown as { defaultTextStyle?: unknown }).defaultTextStyle;
+
+  /**
+   * Fingerprint of the palette the cached rows were painted with.
+   *
+   * `patchedInvalidate` already drops the cache whenever Pi invalidates the
+   * component tree, which is what a theme switch does. This is the second lock:
+   * if some path repaints without invalidating — `setText` with unchanged text,
+   * a preview that swaps the theme object under the patch, a future Pi version
+   * that stops calling `invalidate` — the key still changes and the stale, already
+   * painted rows are not returned. Two probes are enough: the card background and
+   * the accent are the only colours this patch applies.
+   */
+  const paletteKey = (): string => {
+    const theme = getTheme();
+    return `${theme.bg(CARD_BG, "")}\u0000${theme.fg("accent", "")}`;
+  };
 
   const cacheLayout = (
     instance: Markdown,
@@ -362,7 +380,17 @@ export function installPatch(
 
   const patchedRender = function (this: Markdown, width: number): string[] {
     const text = getText(this);
-    const key = `${width}\u0000${text}`;
+    const palette = paletteKey();
+    // Pi memoises its own rows by text and width only, so a palette change that
+    // arrives without an invalidate (same-text setText, a preview that swaps the
+    // theme object) would come back from Pi's cache still painted with the old
+    // theme. Drop Pi's cache for this instance when the palette moved; Pi clears
+    // it for the same reason, just only on its own invalidate path.
+    if (paletteSeen.get(this) !== undefined && paletteSeen.get(this) !== palette) {
+      originalInvalidate.call(this);
+    }
+    paletteSeen.set(this, palette);
+    const key = `${width}\u0000${text}\u0000${palette}`;
     const cached = layoutCache.get(this);
     if (cached?.key === key) return cached.lines;
 
